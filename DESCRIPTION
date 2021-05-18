@@ -1,0 +1,31 @@
+Package: lsgm
+Title: Length selected growth models
+Version: 0.0.0.9000
+Authors@R: 
+  c(person(given = "Genevieve",
+           family = "Phillips",
+           role = c("aut", "cre"),
+           email = "Genevieve.Phillips@awe.gov.au",
+           comment = c(ORCID = "0000-0002-2347-2321")),
+    person(given = "Simon",
+           family = "Wotherspoon",
+           role = c("aut"),
+           email = "Simon.Wotherspoon@utas.edu.au",
+           comment = c(ORCID = "0000-0002-6947-4445")))
+Description: Fits growth models to length at age fisheries data,
+  correcting for selectivity, length bin sampling and ageing errors.
+Depends: 
+  R (>= 4.0.0),
+  TMB
+LinkingTo:
+  TMB,
+  RcppEigen
+License: GPL (>= 3)
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.1.1
+Suggests: 
+    rmarkdown,
+    knitr
+VignetteBuilder: knitr

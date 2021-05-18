@@ -1,0 +1,555 @@
+##' Fit growth models to length-at-age fisheries data, correcting for gear
+##' selectivity, length-stratified sampling, and ageing errors.
+##'
+##' \code{lsVB} is used to fit a growth model of choice to length-at-age
+##' fisheries data by maximum likelihood. The package uses the method of Candy
+##' (2007) extended to account for ageing error, alongside fishery selectivity
+##' and length-stratified initial sampling.
+##'
+##' Data required are based on the common practice of length stratified sampling
+##' fish that are randomly sampled from a sample of fish landed
+##' in a fishing operation. Measured fish selected from a fishery stock based on
+##' length-stratified initial sampling (i.e. random or otherwise selection of
+##' particular fish that are measured, and contribute to the pool of fish that
+##' have the potential to be aged). Aged fish are selected randomly for ageing
+##' from the length-stratified sample. Selectivity is based on fishery-specific
+##' selectivity.
+##'
+##' The ageing error matrix is calculated prior to the use of lgsm (via Punt et
+##' al. (XXXX) or similar methods). The rows of this matrix correspond to
+##' 'actual' age and the columns the 'measured' age, and each column is a
+##' vector of conditional probabilities that an individual is of an actual' age
+##' given their 'measured' age.
+##'
+##'
+##' Growth models used for fitting are von Bertalanffy, Gompertz, logistic, and
+##' Schnute-Richards growth models.
+##'
+##'
+##'---------------------------------------------------------------------------
+##' Fit a von Bertalanffy growth model to length-at-age fisheries data,
+##' correcting for gear selectivity, length-stratified sampling, and ageing
+##' errors.
+##'
+##' @title von Bertalanffy model for length selected data.
+##' @param Age Vector of integer ages (zone counts)
+##' @param Length Vector of measured lengths
+##' @param Aerr Ageing error matrix
+##' @param Lbreaks Internal length bin boundaries
+##' @param fraction Sampling fraction for each bin
+##' @param selectivity Selectivity function
+##' @param Aoffset Ageing offset
+##' @param Amin Minimum age
+##' @param start Initial estimates of model parameters
+##' @param control List of control parameters for nlminb
+##' @param verbose Enable tracing information
+##' @seealso \code{\link{nlminb}}, \code{\link[TMB]{MakeADFun}}
+##' @return An object of class \code{lsVB} with elements
+##'   \item{\code{coefficients}}{a named vector of estimated parameters}
+##'   \item{\code{cov}}{the covariance of the estimated parameters}
+##'   \item{\code{logL}}{log likelihood} \item{\code{aic}}{Akaike information
+##'   criteria} \item{\code{bic}}{Bayesian information criteria}
+##'   \item{\code{opt}}{return value from \code{nlminb}} \item{\code{obj}}{TMB
+##'   object} \item{\code{obj}}{selectivity function} \item{\code{model}}{model
+##'   name} \item{\code{call}}{the matched call} \item{\code{call}}{function to
+##'   evaluate the growth model} \item{\code{call}}{function to evaluate the
+##'   gradient of the growth model}
+##' @useDynLib lsgm
+##' @importFrom TMB MakeADFun sdreport
+##' @importFrom stats nlminb
+##' @export
+lsVB <- function(Age,Length,Aerr,Lbreaks,fraction=1,
+                 selectivity=function(L) 1,
+                 Aoffset=0,Amin=0,
+                 start=list(Linf=1,K=1,t0=0,CV=1),
+                 control=list(),verbose=FALSE) {
+
+  cl <- match.call()
+
+  ## VB growth model
+  growth <- function(age,par) par[1]*(1-exp(-par[2]*(age-par[3])))
+  ## Gradient of the growth model wrt parameters
+  gradient <- function(age,par)
+    cbind((1-exp(-par[2]*(age-par[3]))),
+          par[1]*(age-par[3])*exp(-par[2]*(age-par[3])),
+          -par[1]*par[2]*exp(-par[2]*(age-par[3])),
+          0)
+
+
+  ## von Bertalanffy parameters for TMB
+  tmbpars <- list(logp1=c(log(start$Linf),log(start$K)),
+                  p2 = start$t0,
+                  logCV=log(start$CV))
+
+  ## Fit the model with TMB
+  fit <- lsgmFit(Age,Length,Aerr,Lbreaks,fraction,selectivity,Aoffset,Amin,model=1L,tmbpars,control,verbose)
+
+  ## Set VB specific return parameters
+  names(fit$coefficients) <- c("Linf","K","t0","CV")
+  dimnames(fit$cov) <- list(names(coefficients),names(coefficients))
+  fit$call <- cl
+  ## Set default parameters
+  formals(growth)$par <- fit$coefficients[-length(fit$coefficients)]
+  fit$growth <- growth
+  formals(gradient)$par <- fit$coefficients[-length(fit$coefficients)]
+  fit$gradient <- gradient
+  fit$model <- "Length selected von Bertalanffy"
+  class(fit) <- c("lsVB","lsgm")
+  fit
+}
+
+
+
+##' Fit a Gompertz growth model to length-at-age fisheries data, correcting for
+##' gear selectivity, length-stratified sampling, and ageing errors.
+##'
+##'
+##' @title Gompertz model for length-sampled data.
+##' @param Age Vector of measured ages
+##' @param Length Vector of measured lengths
+##' @param Aerr Ageing error matrix
+##' @param Lbreaks Internal length bin boundaries
+##' @param fraction Sampling fraction for each bin
+##' @param selectivity Selectivity function
+##' @param Aoffset Ageing offset
+##' @param Amin Minimum age
+##' @param start Initial estimates of model parameters
+##' @param control List of control parameters for nlminb
+##' @param verbose Enable tracing information
+##' @seealso \code{\link{nlminb}}, \code{\link[TMB]{MakeADFun}}
+##' @return An object of class \code{lsVB} with elements
+##'   \item{\code{coefficients}}{a named vector of estimated parameters}
+##'   \item{\code{cov}}{the covariance of the estimated parameters}
+##'   \item{\code{logL}}{log likelihood} \item{\code{aic}}{Akaike information
+##'   criteria} \item{\code{bic}}{Bayesian information criteria}
+##'   \item{\code{opt}}{return value from \code{nlminb}} \item{\code{obj}}{TMB
+##'   object} \item{\code{obj}}{selectivity function} \item{\code{model}}{model
+##'   name} \item{\code{call}}{the matched call} \item{\code{call}}{function to
+##'   evaluate the growth model} \item{\code{call}}{function to evaluate the
+##'   gradient of the growth model}
+##' @useDynLib lsgm
+##' @importFrom TMB MakeADFun sdreport
+##' @importFrom stats nlminb
+##' @export
+lsGompertz <- function(Age,Length,Aerr,Lbreaks,fraction=1,
+                       selectivity=function(L) 1,
+                       Aoffset=0,Amin=0,
+                       start=list(Linf=1,K=1,t0=0,CV=1),
+                       control=list(),verbose=FALSE) {
+
+  cl <- match.call()
+
+  ## Gompertz growth model
+  growth <- function(age,par) par[1]*exp(-exp(-par[2]*(age-par[3]))/par[2])
+  ## Gradient of the growth model wrt parameters
+  gradient <- function(age,par)
+    cbind(exp(-exp(-par[2]*(age-par[3]))/par[2]),
+          -par[1]*(par[2]*(age-par[3])+1)/par[2]^2*exp(-par[2]*(age-par[3])-exp(-par[2]*(age-par[3]))/par[2]),
+          -par[1]*exp(-par[2]*(age-par[3])-exp(-par[2]*(age-par[3]))/par[2]),
+          0)
+
+
+  ## Gompertz parameters for TMB
+  tmbpars <- list(logp1=c(log(start$Linf),log(start$K)),
+                  p2 = start$t0,
+                  logCV=log(start$CV))
+
+  ## Fit the model with TMB
+  fit <- lsgmFit(Age,Length,Aerr,Lbreaks,fraction,selectivity,Aoffset,Amin,model=2L,tmbpars,control,verbose)
+
+  ## Set Gompertz specific return parameters
+  names(fit$coefficients) <- c("Linf","K","t0","CV")
+  dimnames(fit$cov) <- list(names(coefficients),names(coefficients))
+  fit$call <- cl
+  ## Set default parameters
+  formals(growth)$par <- fit$coefficients[-length(fit$coefficients)]
+  fit$growth <- growth
+  formals(gradient)$par <- fit$coefficients[-length(fit$coefficients)]
+  fit$gradient <- gradient
+  fit$model <- "Length selected Gompertz"
+  class(fit) <- c("lsGompertz","lsgm")
+  fit
+}
+
+##' Fit a Schnute-Richards growth model to length-at-age fisheries data, correcting for
+##' gear selectivity, length-stratified sampling, and ageing errors.
+##'
+##'
+##' @title Schnute-Richards model for length-sampled data.
+##' @param Age Vector of measured ages
+##' @param Length Vector of measured lengths
+##' @param Aerr Ageing error matrix
+##' @param Lbreaks Internal length bin boundaries
+##' @param fraction Sampling fraction for each bin
+##' @param selectivity Selectivity function
+##' @param Aoffset Ageing offset
+##' @param Amin Minimum age
+##' @param start Initial estimates of model parameters
+##' @param control List of control parameters for nlminb
+##' @param verbose Enable tracing information
+##' @seealso \code{\link{nlminb}}, \code{\link[TMB]{MakeADFun}}
+##' @return An object of class \code{lsVB} with elements
+##'   \item{\code{coefficients}}{a named vector of estimated parameters}
+##'   \item{\code{cov}}{the covariance of the estimated parameters}
+##'   \item{\code{logL}}{log likelihood} \item{\code{aic}}{Akaike information
+##'   criteria} \item{\code{bic}}{Bayesian information criteria}
+##'   \item{\code{opt}}{return value from \code{nlminb}} \item{\code{obj}}{TMB
+##'   object} \item{\code{obj}}{selectivity function} \item{\code{model}}{model
+##'   name} \item{\code{call}}{the matched call} \item{\code{call}}{function to
+##'   evaluate the growth model} \item{\code{call}}{function to evaluate the
+##'   gradient of the growth model}
+##' @useDynLib lsgm
+##' @importFrom TMB MakeADFun sdreport
+##' @importFrom stats nlminb
+##' @export
+lsSchnuteRichards <- function(Age,Length,Aerr,Lbreaks,fraction=1,
+                       selectivity=function(L) 1,
+                       Aoffset=0,Amin=0,
+                       start=list(Linf=1,K=1,alpha=1,nu=1,gamma=1,CV=1),
+                       control=list(),verbose=FALSE) {
+
+  cl <- match.call()
+
+  ## Schnute-Richards growth model - there are extra parameters...alpha(par[3]),
+  ## nu, par[4], and gamma, par[5] and no t0 (ORIGINAL par[3]).
+
+  growth <- function(age,par) par[1]*(1+par[3]*exp(-par[2]*(age^par[4])))^(-1/par[5])
+  ## Gradient of the growth model wrt parameters
+  gradient <- function(age,par)
+    cbind((par[3]*exp(-par[2]*(age^par[4])) + 1)^1/par[5],
+          par[1]*age^(par[4])*par[3]*((par[3] + exp(par[2]*(age^par[4])))*exp(-par[2]*age^par[4]))^(1/par[5])/(par[5]*(par[3] + exp*(par[2]*age^par[4]))),
+          0)
+  ##no t0
+
+
+  ## Schnute-Richards parameters for TMB - Spoon to check
+  tmbpars <- list(logp1=c(log(start$Linf),log(start$K),log(start$alpha), log(start$nu), log(start$gamma)),
+                  p2 = 0,
+                  logCV=log(start$CV))
+
+  ## Fit the model with TMB
+  fit <- lsgmFit(Age,Length,Aerr,Lbreaks,fraction,selectivity,Aoffset,Amin,model=2L,tmbpars,control,verbose)
+
+  ## Set Gompertz specific return parameters
+  names(fit$coefficients) <- c("Linf","K","alpha","nu","gamma","CV")
+  dimnames(fit$cov) <- list(names(coefficients),names(coefficients))
+  fit$call <- cl
+  ## Set default parameters
+  formals(growth)$par <- fit$coefficients[-length(fit$coefficients)]
+  fit$growth <- growth
+  formals(gradient)$par <- fit$coefficients[-length(fit$coefficients)]
+  fit$gradient <- gradient
+  fit$model <- "Length selected Schnute-Richards"
+  class(fit) <- c("lsSchnuteRichards","lsgm")
+  fit
+}
+
+##' Fit a logistic growth model to length-at-age fisheries data, correcting for
+##' gear selectivity, length-stratified sampling, and ageing errors.
+##'
+##'
+##' @title Logistic model for length-sampled data.
+##' @param Age Vector of measured ages
+##' @param Length Vector of measured lengths
+##' @param Aerr Ageing error matrix
+##' @param Lbreaks Internal length bin boundaries
+##' @param fraction Sampling fraction for each bin
+##' @param selectivity Selectivity function
+##' @param Aoffset Ageing offset
+##' @param Amin Minimum age
+##' @param start Initial estimates of model parameters
+##' @param control List of control parameters for nlminb
+##' @param verbose Enable tracing information
+##' @seealso \code{\link{nlminb}}, \code{\link[TMB]{MakeADFun}}
+##' @return An object of class \code{lsVB} with elements
+##'   \item{\code{coefficients}}{a named vector of estimated parameters}
+##'   \item{\code{cov}}{the covariance of the estimated parameters}
+##'   \item{\code{logL}}{log likelihood} \item{\code{aic}}{Akaike information
+##'   criteria} \item{\code{bic}}{Bayesian information criteria}
+##'   \item{\code{opt}}{return value from \code{nlminb}} \item{\code{obj}}{TMB
+##'   object} \item{\code{obj}}{selectivity function} \item{\code{model}}{model
+##'   name} \item{\code{call}}{the matched call} \item{\code{call}}{function to
+##'   evaluate the growth model} \item{\code{call}}{function to evaluate the
+##'   gradient of the growth model}
+##' @useDynLib lsgm
+##' @importFrom TMB MakeADFun sdreport
+##' @importFrom stats nlminb
+##' @export
+lslogistic <- function(Age,Length,Aerr,Lbreaks,fraction=1,
+                              selectivity=function(L) 1,
+                              Aoffset=0,Amin=0,
+                              start=list(Linf=1,K=1,t0=1,CV=1),
+                              control=list(),verbose=FALSE) {
+
+  cl <- match.call()
+
+  ## logistic growth model.
+
+  growth <- function(age,par) par[1]*(1+exp(-par[2]*(age-par[3])))^-1
+  ## Gradient of the growth model wrt parameters
+  gradient <- function(age,par)
+    cbind(1/(1 + exp(-par[2]*(age-par[3]))),
+          -((par[1]*(age+par[3])*exp(-par[2]*(age-par[3])))/(1 + exp(-par[2]*(age-par[3])))^2),
+          -((par[2]*par[1]*exp(-par[2]*(age-par[3])))/(1+exp(-par[2]*age-par[3]))^2),
+          0)
+
+  ## logistic parameters for TMB - Spoon to check
+  tmbpars <- list(logp1=c(log(start$Linf),log(start$K)),
+                  p2 = start$t0,
+                  logCV=log(start$CV))
+
+  ## Fit the model with TMB
+  fit <- lsgmFit(Age,Length,Aerr,Lbreaks,fraction,selectivity,Aoffset,Amin,model=2L,tmbpars,control,verbose)
+
+  ## Set logistic specific return parameters
+  names(fit$coefficients) <- c("Linf","K","t0","CV")
+  dimnames(fit$cov) <- list(names(coefficients),names(coefficients))
+  fit$call <- cl
+  ## Set default parameters
+  formals(growth)$par <- fit$coefficients[-length(fit$coefficients)]
+  fit$growth <- growth
+  formals(gradient)$par <- fit$coefficients[-length(fit$coefficients)]
+  fit$gradient <- gradient
+  fit$model <- "Length selected logistic"
+  class(fit) <- c("lslogistic","lsgm")
+  fit
+}
+
+
+
+##' Fit a growth model to length-at-age fisheries data,
+##' correcting for gear selectivity, length-stratified sampling, and ageing
+##' errors.
+##'
+##' @title Growth model for length selected data.
+##' @param Age Vector of measured ages
+##' @param Length Vector of measured lengths
+##' @param Aerr Ageing error matrix
+##' @param Lbreaks Internal length bin boundaries
+##' @param fraction Sampling fraction for each bin
+##' @param selectivity Selectivity function
+##' @param Aoffset Ageing offset
+##' @param Amin Minimum age
+##' @param model Model indicator
+##' @param tmbpars Model parameter list
+##' @param control List of control parameters for nlminb
+##' @param verbose Enable tracing information
+##' @param start Initial estimates of model parameters
+##' @seealso \code{\link{nlminb}}, \code{\link[TMB]{MakeADFun}}
+##' @return An object of class \code{lsgm}, with elements
+##'   \item{\code{coefficients}}{a named vector of estimated parameters}
+##'   \item{\code{cov}}{the covariance of the estimated parameters}
+##'   \item{\code{logL}}{log likelihood} \item{\code{aic}}{Akaike information
+##'   criteria} \item{\code{bic}}{Bayesian information criteria}
+##'   \item{\code{opt}}{return value from \code{nlminb}} \item{\code{obj}}{TMB
+##'   object} \item{\code{obj}}{selectivity function} \item{\code{model}}{model
+##'   name}
+##' @useDynLib lsgm
+##' @importFrom TMB MakeADFun sdreport
+##' @importFrom stats nlminb
+##' @export
+lsgmFit <- function(Age,Length,Aerr,Lbreaks,fraction=1,
+                    selectivity=function(L) 1,
+                    Aoffset=0,Amin=0,
+                    model,tmbpars,
+                    control=list(),verbose=FALSE) {
+
+  ## Bin midpoints
+  midpts <- c(Lbreaks[1],
+              0.5*(Lbreaks[-1]+Lbreaks[-length(Lbreaks)]),
+              Lbreaks[length(Lbreaks)])
+  ## Selectivity and sampling fraction for each bin
+  Sbin <- selectivity(midpts)
+  Fbin <- rep(fraction,length.out=length(Lbreaks)+1)
+
+  tmbdata <- list(A=Age,
+                  L=Length,
+                  ## Selectivity of the observations
+                  S=selectivity(Length),
+                  ## Length bin of each observation
+                  bin=.bincode(Length,sort(unique(c(0,Lbreaks,Inf))),right=FALSE),
+                  ## Ageing offset for each individual
+                  Aoff=rep(Aoffset,length.out=length(Age)),
+                  ## Length bin internal breaks
+                  Lbrk=Lbreaks,
+                  ## Selectivity for each bin
+                  Sbin=Sbin,
+                  ## Sampling fraction for each bin
+                  Fbin=Fbin,
+                  ## Ageing error matrix
+                  Aerr=Aerr,
+                  ## Minimum age
+                  Amin=Amin,
+                  ## Model type
+                  model=model)
+
+  ## Create TMB object
+  obj <- MakeADFun(tmbdata,tmbpars,DLL="lsgm",silent=!verbose)
+  ## Minimize objective function
+  opt <- suppressWarnings(nlminb(obj$par, obj$fn, obj$gr,control=control))
+  rep <- sdreport(obj)
+
+  ## Extract estimates and full covariance
+  coef <- rep$value
+  cov <- rep$cov
+
+  structure(
+    list(coefficients=rep$value,
+         cov=rep$cov,
+         logL=-opt$objective,
+         aic=2*length(coef)+2*opt$objective,
+         bic=log(length(Length))*length(coef)+2*opt$objective,
+         opt=opt,
+         obj=obj,
+         selectivity=selectivity,
+         model="lsgm"),
+    class=c("lsgm"))
+}
+
+
+##' Diagnostic quantities for an \code{lsgm} fit
+##'
+##' detials
+##' @title Diagnostics for lsgm objects
+##' @param fit an fitted \code{lsgm} object
+##' @return yes
+##' @export
+diagnostics <- function(fit) {
+
+  ## Import objects from fit
+  coef <- fit$coefficients
+  CV <- coef[length(coef)]
+  growth <- fit$growth
+  selectivity <- fit$selectivity
+
+  ## Import data
+  Age <- fit$obj$env$data$A
+  Length <- fit$obj$env$data$L
+  Aoffset <- fit$obj$env$data$Aoff
+  Lbreaks <- c(0,fit$obj$env$data$Lbrk,Inf)
+  Sbin <- fit$obj$env$data$Sbin
+  Fbin <- fit$obj$env$data$Fbin
+  Aerr <- fit$obj$env$data$Aerr
+  Amin <- fit$obj$env$data$Amin
+
+  ## Length selectivity adjusted likelihood
+  adjustedLik <- function(L,mu,cv) {
+    b <- .bincode(L,Lbreaks,right=FALSE)
+    N <- colSums(diff(outer(Lbreaks,as.vector(mu),function(L,mu) pnorm(L,mu,cv*mu)))*(Sbin*Fbin))
+    dim(N) <- dim(mu)
+    dnorm(L,mu,cv*mu)*selectivity(L)*Fbin[b]/N
+  }
+
+  fitted <- double(length(Age))
+  deviance <- double(length(Age))
+  meanLen <- double(length(Age))
+  meanAge <- double(length(Age))
+  xs <- c(0,fit$obj$env$data$Lbrk,2*max(fit$obj$env$data$Lbrk))
+  xs <- sort(c(xs,(xs[-1]+xs[-length(xs)])/2))
+  for(i in seq_along(Age)) {
+    ## Compute means and weights for the non-zero weights
+    w <- Aerr[Age[i]-Amin+1,]
+    sub <- which(w>0)
+    w <- w[sub]
+    ages <- sub+(Amin-1)
+    mu <- growth(ages+Aoffset[i],coef)
+    ## Estimate fitted values as the maximum likelihood response for the observed age.  The
+    ## likelihood is discontinuous at the bin boundaries, so we evaluate on a grid to find the
+    ## approximate minimum
+    nlik <- function(L) -sum(w*adjustedLik(L,mu,CV))
+    j <- which.min(sapply(xs,nlik))
+    opt <- optimize(nlik,xs[c(max(1,j-1),min(length(xs),j+1))],tol=1.0E-6)
+    fitted[i] <- opt$minimum
+
+    ps <- w*adjustedLik(Length[i],mu,CV)
+    meanAge[i] <- sum(ps*ages)/sum(ps)
+    meanLen[i] <- sum(ps*mu)/sum(ps)
+
+    ## Fit a separate mean for each observation to calculate the deviance
+    opt <- optimize(function(mu) -adjustedLik(Length[i],mu,CV),range(Length),tol=1.0E-6)
+    deviance[i] <- 2*log(-opt$objective)-2*log(sum(ps))
+  }
+  data.frame(age=Age,length=Length,ageOffset=Aoffset,
+             fitted=fitted,deviance=deviance,meanAge=meanAge,meanLength=meanLen)
+}
+
+
+##' Predicted values from a length selected growth model fit
+##'
+##' The computes predictions from a fitted length selected growth
+##' model. The supplied ages are assumed to contain no error (but an
+##' offset can be supplied).  The standard error of the mean is
+##' computed by the delta method, and the standard deviation for the
+##' future observations are computed conditional on the estimated CV.
+##'
+##' @title Predict method for \code{lsgm} fits
+##' @param fit an \code{lsgm} object
+##' @param Age a vector of (true) ages to predict
+##' @param Aoffset a vector of age offsets
+##' @return a dataframe with columns
+##' \item{\code{age}}{the age}
+##' \item{\code{length}}{the predicted length}
+##' \item{\code{se}}{the standard error of the predicted length}
+##' \item{\code{sd}}{the standard deviation of a future observation}
+##' @export
+predict.lsgm <- function(object,Age,Aoffset=0) {
+
+  age <- Age+Aoffset
+  coef <- object$coefficients
+  ## Fitted means and their gradient wrt to the parameters
+  mu <- object$growth(age,coef)
+  gr <- object$gradient(age,coef)
+  ## Compute approximate variances by the delta method
+  v <- rowSums((gr%*%fit$cov)*gr)
+  CV <- coef[length(coef)]
+  data.frame(age=age,length=mu,se=sqrt(v),sd=CV*mu)
+}
+
+
+
+##' @export
+print.lsgm <- function(x, digits = max(3L, getOption("digits")-3L), ...) {
+  cat(x$model,"growth model\n\nCall:\n")
+  print(x$call)
+  invisible(x)
+}
+
+
+
+##' Summary method for \code{lsgm} objects
+##'
+##' @title Summarizing length selected growth model fits.
+##' @param object an lsgm object
+##' @param ... currently ignored
+##' @return An object of class \code{summary.lsgm}
+##' @importFrom stats pnorm
+##' @export
+summary.lsgm <- function(object,...) {
+  coef <- object$coefficients
+  se <- sqrt(diag(object$cov))
+  zval <- abs(coef)/se
+  coefficients <- cbind(Estimate = coef,
+                        `Std. Error` = se,
+                        `z value` = zval,
+                        `Pr(>|z|)` = 2*pnorm(zval,lower.tail = FALSE))
+  structure(
+    list(model=object$model,
+         logLik=data.frame(AIC=object$aic,BIC=object$bic,logLik=object$logL),
+         coefficients=coefficients),
+    class=c("summary.lsgm"))
+}
+
+
+
+
+##' @importFrom stats printCoefmat
+##' @export
+print.summary.lsgm <- function(x,digits=3,signif.stars = getOption("show.signif.stars"),...) {
+  cat(x$model,"growth model\n\n")
+  print(x$logLik, row.names = FALSE)
+  cat("\nCoefficients:\n")
+  printCoefmat(x$coefficients, digits = digits, signif.stars = signif.stars)
+  invisible(x)
+}
+
+

@@ -1,0 +1,5 @@
+.Rproj.user
+inst/doc
+src/*.dll
+src/*.o
+src/*.so
