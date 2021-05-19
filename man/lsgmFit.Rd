@@ -2,7 +2,7 @@
 % Please edit documentation in R/lsgm.R
 \name{lsgmFit}
 \alias{lsgmFit}
-\title{Growth models for length selected data.}
+\title{Growth model for length selected data.}
 \usage{
 lsgmFit(
   Age,
@@ -43,8 +43,6 @@ lsgmFit(
 \item{control}{List of control parameters for nlminb}
 
 \item{verbose}{Enable tracing information}
-
-\item{start}{Initial estimates of model parameters}
 }
 \value{
 An object of class \code{lsgm}, with elements
@@ -55,15 +53,13 @@ An object of class \code{lsgm}, with elements
 \item{\code{bic}}{Bayesian information criteria}
 \item{\code{opt}}{return value from \code{nlminb}}
 \item{\code{obj}}{TMB object}
-\item{\code{obj}}{selectivity function}
+\item{\code{selectivity}}{selectivity function}
 \item{\code{model}}{model name}
 }
 \description{
-Fit a growth model to length at age fisheries data, correcting for
-selectivity, length bin sampling and ageing errors.
-}
-\details{
-Describe here what it does
+Fit a growth model to length-at-age fisheries data,
+correcting for gear selectivity, length-stratified sampling, and ageing
+errors.
 }
 \seealso{
 \code{\link{nlminb}}, \code{\link[TMB]{MakeADFun}}

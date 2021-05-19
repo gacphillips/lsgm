@@ -14,7 +14,7 @@ Type objective_function<Type>::operator() () {
   DATA_VECTOR(S);		// Vector of estimated selectivity
   DATA_IVECTOR(bin);            // Vector of bin membership
   DATA_VECTOR(Aoff);            // Ageing offset
-
+  
   // Length bin description
   DATA_VECTOR(Lbrk);            // Length bin boundaries
   DATA_VECTOR(Sbin);            // Approximate selectivity for each bin
@@ -39,7 +39,7 @@ Type objective_function<Type>::operator() () {
   // Loop over individuals
   for(int i=0; i < A.size(); i++) {
     Type lik = Type(0.0);
-
+    
     // Sum over the true ages
     for(int a=Amin; a<Amin+Aerr.rows(); a++) {
       Type num = Type(0.0);
@@ -60,11 +60,11 @@ Type objective_function<Type>::operator() () {
 	case 2: // Gompertz
 	  mu = p1(0)*exp(-exp(-p1(1)*(age-p2(0)))/p1(1));
 	  break;
-	case 3: // Schnute-Richards
-	  mu = p1(0)*(Type(1.0)+p1(3)*exp(-p1(2)*(age^p1(3))))^(Type(-1.0)/p1(4))
+	case 3: // logistic
+	  mu = p1(0)/(Type(1.0)+exp(-p1(1)*(age-p2(0))));
 	  break;
-	case 4: // logistic
-	  mu = p1(0)*(Type(1.0)+exp(-p1(1)*(age-p2(0))))^Type(-1.0)
+	case 4: // Schnute-Richards
+	  mu = p1(0)*pow(Type(1.0)+p1(3)*exp(-p1(2)*pow(age,p1(3))),Type(-1.0)/p1(4));
 	  break;
 	}
 	Type sigma = CV*mu;
@@ -80,7 +80,7 @@ Type objective_function<Type>::operator() () {
 	for(int b=1; b<Lbrk.size(); b++)
 	  den += (pnorm(Lbrk(b),mu,sigma)-pnorm(Lbrk(b-1),mu,sigma))*Sbin(b)*Fbin(b);
 	den += (Type(1.0)-pnorm(Lbrk(Lbrk.size()-1),mu,sigma))*Sbin(Lbrk.size())*Fbin(Lbrk.size());
-
+	
 
 	// Contribution to marginal likelihood
 	lik += prAge*num/den;;

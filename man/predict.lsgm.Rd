@@ -4,14 +4,16 @@
 \alias{predict.lsgm}
 \title{Predict method for \code{lsgm} fits}
 \usage{
-\method{predict}{lsgm}(object, Age, Aoffset = 0)
+\method{predict}{lsgm}(object, Age, Aoffset = 0, ...)
 }
 \arguments{
+\item{object}{an \code{lsgm} object}
+
 \item{Age}{a vector of (true) ages to predict}
 
 \item{Aoffset}{a vector of age offsets}
 
-\item{fit}{an \code{lsgm} object}
+\item{...}{currently ignored}
 }
 \value{
 a dataframe with columns

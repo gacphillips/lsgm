@@ -1,0 +1,162 @@
+---
+title: "Simulation"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Simulation}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(lsgm)
+```
+
+
+## Catchable Population
+
+The function `rfage` simulates the age of `n` fished individuals assuming perfect selectivity, constant natural mortality `M`, constant fishing mortality `F` within a fishing season that extends over the fraction `a` to `b` of each year, where `rs` is the vector of  recruits in previous years.
+```{r}
+rfage <- function(n,M,F,a,b,rs) {
+  ## Order recruits into the past
+  rs <- rev(rs)
+  amax <- length(rs)
+  ## Cumulative mortality
+  xs <- c(0,c(a,b)+rep(0:(amax-1),each=2),amax)
+  ys <- F*c(0,c(0,1)+rep(0:(amax-1),each=2),amax)+M*xs
+  ## Distribution function
+  zs <- 1-exp(-ys)
+  ## Numbers caught each season
+  ws <- diff(zs)[seq(from=2,by=2,length.out=amax)]
+  ns <- as.vector(rmultinom(1,n,ws*rs))
+  ## Uniform deviates within each season
+  us <- unlist(mapply(runif,ns,zs[seq(from=2,by=2,length=amax)],zs[seq(from=3,by=2,length=amax)]))
+  ## Inverse probability transform
+  approx(ys,xs,-log(1-us))$y
+}
+```
+
+
+Simulate the ages of the population of fish available to be caught within the fishing season
+```{r}
+season <- c(0.25,0.75)
+M <- 0.03
+F <- 0.07
+maxAge <- 36
+df.pop <- data.frame(age=rfage(1000000,0.07,0.1,season[1],season[2],rep(1,maxAge)))
+```
+
+Simulate lengths assume a von Bertalanffy growth model in which the lengths are Normally distributed about the expected length with constant coefficient of variation. 
+```{r}
+Linf <- 1600
+K <- 0.07
+a0 <- -1.8
+cv <- 0.12
+df.pop <- within(df.pop,{
+  mu <- Linf*(1-exp(-K*(age-a0)))
+  length <- rnorm(length(mu),mu,cv*mu)
+})
+```
+
+These individuals represent the individuals that are available to be fished; to simulate the catch gear selectivity must be accounted for.  Define a double Normal plateau selectivity
+```{r}
+mkSelectivity <- function(xa,xb,sa,sb,ya,yb,xmin,xmax) {
+  join <- function(x0,x) 1/(1+exp(-20*(x-x0)/(1+abs(x-x0))))
+  normal <- function(mu,s,x) exp(-(x-mu)^2/(2*s^2))
+  limb <- function(xp,s,xr,yr,x)  yr+(1-yr)*(normal(xp,s,x)-normal(xp,s,xr))/(1-normal(xp,s,xr))
+
+  function(x) {
+    ja <- join(xa,x)
+    jb <- join(xb,x)
+    limb(xa,sa,xmin,ya,x)*(1-ja)+ja*((1-jb)+jb*limb(xb,sb,xmax,yb,x))
+  }
+}
+selectivity <- mkSelectivity(500,900,120,250,0.01,0.2,0,2000)
+plot(0:2000,selectivity(0:2000),type="l",xlab="Length",ylab="Selectivity")
+```
+
+Sample the population to generate the catch, with selection probabilities determined by the gear selectivity
+```{r}
+df.catch <- df.pop[sample(nrow(df.pop),1000,prob=selectivity(df.pop$length)),]
+plot(length~age,data=df.catch,pch=16,col=grey(0.5,0.1))
+```
+
+
+## Age Error
+
+Create a matrix that gives the probability of an aging error - rows represent the true age and columns the measured age
+```{r}
+ages <- 0:maxAge
+ageErr <- matrix(0,length(ages),length(ages),dimnames=list(ages,ages))
+for(k in 1:nrow(ageErr))
+  ageErr[k,] <- dbeta((ages+1)/(maxAge+2),100*k/(maxAge+2),100*(1-k/(maxAge+2)))
+ageErr <- ageErr/rowSums(ageErr)
+ageErr <- ifelse(ageErr < 1.0E-6,0,ageErr)
+ageErr[1:5,1:5]
+```
+
+## Length Bin Sampling
+
+Divide the catch into length bins and attempt to sample at most `n` individuals from each bin, treating the top bin as 2000mm or greater.
+```{r}
+n <- 5
+breaks <- seq(200,2000,10)
+ks <- unlist(lapply(split(1:nrow(df.catch),cut(df.catch$length,c(0,breaks,Inf)),drop=TRUE),
+                    function(ks) sample(ks,pmin(n,length(ks)))))
+df.sample <- df.catch[ks,]
+## Sampling fractions
+frac <- (tabulate(.bincode(df.sample$length,c(0,breaks,Inf)),nbin=length(breaks)+1)/
+           pmax(1,tabulate(.bincode(df.catch$length,c(0,breaks,Inf)),nbin=length(breaks)+1)))
+```
+
+
+Round the true age down to get the true otolith counts, and add aging error based on the age error matrix.
+```{r}
+## Add aging errors
+df.sample$age0 <- df.sample$age
+for(a in ages) {
+  ks <- a==floor(df.sample$age0)
+  df.sample$age[ks] <- sample(ages,sum(ks),replace=TRUE,prob=ageErr[a+1,])
+}
+df.sample$ageOffset <- 0.5
+plot(length~age,data=df.sample,pch=16,col=grey(0.5,0.1))
+```
+
+
+## NLME 
+
+Fit ignoring length selectivity
+```{r}
+library(nlme)
+fit1 <- gnls(length ~ Linf*(1-exp(-K*(age-t0))),
+             weight=varPower(fixed=1),
+             start=list(Linf=1600,K=0.06,t0=-1.8),
+             control=gnlsControl(nlsTol=0.01,returnObject=TRUE),
+             data=df.sample)
+summary(fit1)
+```
+
+
+
+## LSGM
+
+Fit the length selected von Bertalanffy model
+```{r}
+library(lsgm)
+fit <- lsVB(df.sample$age,df.sample$length,ageErr,breaks,frac,
+            selectivity = selectivity,
+            Aoffset=df.sample$ageOffset,
+            start=list(Linf=1600,K=0.06,t0=-1.8,CV=0.1))
+summary(fit)
+```
+
+
+
+
+
