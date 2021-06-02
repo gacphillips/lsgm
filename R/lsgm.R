@@ -605,3 +605,25 @@ print.summary.lsgm <- function(x,digits=3,signif.stars = getOption("show.signif.
 }
 
 
+##' Calculate the log likelihood profile with respect to a single
+##' parameter for a length selected growth model fit.
+##'
+##' This function is a wrapper for \code{\link[TMB]{tmbprofile}}.
+##'
+##' @title Summarizing length selected growth model fits.
+##' @param fitted an lsgm object
+##' @param which name or index of a parameter to profile
+##' @param ... additional parameters to pass to \code{\link[TMB]{tmbprofile}}.
+##' @return data.frame with parameter and function values.
+##' @seealso \code{\link[TMB]{plot.tmbprofile}}, \code{\link[TMB]{confint.tmbprofile}}.
+##' @importFrom TMB tmbprofile
+##' @export
+profile.lsgm <- function(fitted,which,...) {
+  nms <- names(fitted$coefficients)
+  if(is.character(which))
+    which <- which(which==nms)
+  pr <- tmbprofile(fitted$obj,which,...)
+  names(pr)[1] <- nms[which]
+  if(names(fitted$obj$par)[which] %in% c("logp1","logCV")) pr[[1]] <- exp(pr[[1]])
+  pr
+}
