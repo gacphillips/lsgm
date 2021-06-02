@@ -19,32 +19,41 @@ knitr::opts_chunk$set(
 
 The model assumes that the true age \(a\) of an individual can be decomposed into an otolith zone
 count \(k\) plus a known offset \(z\) that accounts for any initial period of growth before the
-first zone is formed, and the interval between time of year at which zones become distinct and the time at which the sample was collected
+first zone is formed, and the interval between time of year at which zones become distinct and the
+time at which the sample was collected
 \[
 a = k + z.
 \]
 Deriving zone counts from otoliths is a complex and demanding process and invariably zones are
-mis-counted leading to a degree of error in the process. Appropriate quality control processes allow the probability of these errors to be determined. To reduce costs, it is common in fisheries science to select a random sample of the population to age. The sample to be aged is selected based on the length of the fish (length-stratified sampling). 
+mis-counted leading to a degree of error in the process. Appropriate quality control processes allow
+the probability of these errors to be determined. To reduce costs, it is common in fisheries science
+to select a random sample of the population to age. The sample to be aged is selected based on the
+length of the fish (length-stratified sampling).
 
 Let \(\mathcal{S}\) be the event that an individual is selected for ageing, and assume that the
-probability \(p(K\,|\, k,\mathcal{S})\) that the observed zone count is \(K\) when the true count is \(k\) can
-be determined. The corresponding probability \(p(k\,|\, K,\mathcal{S})\) that the true count is \(k\) when the
-the observed count is \(K\) can be determined by Bayes' rule
+probability \(p(K\,|\, k,\mathcal{S})\) that the observed zone count is \(K\) when the true count is
+\(k\) can be determined. The corresponding probability \(p(k\,|\, K,\mathcal{S})\) that the true
+count is \(k\) when the the observed count is \(K\) can be determined by Bayes' rule
 \[
 p(k\,|\,K,\mathcal{S}) = \frac{p(K\,|\,k,\mathcal{S})p(k\,|\,\mathcal{S})}{\sum_{k} p(K\,|\,k,\mathcal{S})p(k\,|\,\mathcal{S})}.
 \]
 
-Although every effort is made to randomly sample fish from the population for ageing, not every individual in the population has an equal chance of being selected for ageing.  Length bin
-sampling and gear selectivity effects mean that the probability an individual will be sampled is
-dependent upon its length, and this can lead to bias in estimated growth parameters if not properly accounted for.
+Although every effort is made to randomly sample fish from the population for ageing, not every
+individual in the population has an equal chance of being selected for ageing.  Length bin sampling
+and gear selectivity effects mean that the probability an individual will be sampled is dependent
+upon its length, and this can lead to bias in estimated growth parameters if not properly accounted
+for.
 
-If \(p(L\,|\,k)\) is the probability an individual with true zone count \(k\) is of length
-\(L\) within the population, the by Bayes' rule the corresponding probability within the aged sample is
+If \(p(L\,|\,k)\) is the probability an individual with true zone count \(k\) is of length \(L\)
+within the population, then by Bayes' rule the corresponding probability within the aged sample is
 \[
 p(L \,|\, k,\mathcal{S}) = 
 \frac{ p(\mathcal{S} \,|\, L) p(L \,|\, k)}{\int p(\mathcal{S}\,|\, L) p(L \,|\, k)\,dL},
 \]
-where it has been assumed that the probability \(p(\mathcal{S} \,|\, L)\) that an individual will be selected for ageing is dependent only upon its length.  In turn, the probability that an individual with observed zone count \(K\) is of length \(L\) can be obtained by marginalizing over the true count \(k\)
+where it has been assumed that the probability \(p(\mathcal{S} \,|\, L)\) that an individual will be
+selected for ageing is dependent only upon its length.  In turn, the probability that an individual
+with observed zone count \(K\) is of length \(L\) can be obtained by marginalizing over the true
+count \(k\)
 \[
 \begin{aligned}
 p(L \,|\,K,\mathcal{S}) &= \sum_{k} p(L,k\,|\,K,\mathcal{S})\\ 
@@ -59,10 +68,19 @@ The distribution of length at age within the population is governed by a growth 
   \mu &= g(a\,;\,\theta)
 \end{aligned}
 \]
-where the length \(L\) of an individual is distributed about its expected value \(mu\) according
-to a known distribution \(\mathcal{F}\) with dispersion parameter \(\phi\), and the expected length is a function \(g\) of age \(a\) dependent upon parameters \(\theta\).  Further, individuals are then caught with gear that has length dependent selectivity \(s(L)\), and sampled for ageing by partitioning the catch into length bins \([l_{0}=0,l_{1}),[l_{1},l_{2}),\ldots,[l_{m-2},l_{m-1}),[l_{m-1},l_{m}=\infty)\), and selecting \(n_{i}\) individuals from the total \(N_{i}\) individuals in bin\(i\), for each of the \(m\) bins. 
+where the length \(L\) of an individual is distributed about its expected value \(\mu\) according to
+a known distribution \(\mathcal{F}\) with dispersion parameter \(\phi\), and the expected length is
+a function \(g\) of age \(a\) dependent upon parameters \(\theta\).  Further, individuals are then
+caught with gear that has length dependent selectivity \(s(L)\), and sampled for ageing by
+partitioning the catch into length bins
+\([l_{0}=0,l_{1}),[l_{1},l_{2}),\ldots,[l_{m-2},l_{m-1}),[l_{m-1},l_{m}=\infty)\), and selecting
+\(n_{i}\) individuals from the total \(N_{i}\) individuals in bin \(i\), for each of the \(m\) bins.
 
-If selectivity in each bin is approximated by the quantities
+Then 
+\[
+p(L \,|\, k,\theta,\phi) = f(L\,;\,g(k+z\,;\,\theta),\phi)
+\]
+and if selectivity in each bin is approximated by the quantities
 \[
 s_{i} = 
 \begin{cases}
@@ -71,18 +89,16 @@ s((l_{i-1}+l_{i})/2) &  1 < i < m\\
 s(l_{m-1}) & i=m
 \end{cases}
 \]
-Then 
-\[
-p(L \,|\, k,\theta,\phi) = f(L\,;\,g(k+z\,;\,\theta),\phi)
-\]
-and approximately
+then approximately
 \[
 p(L \,|\, k,\theta,\phi,\mathcal{S}) = 
-\frac{(n_{b}/N_{b}) s(L) f(L\,;\,g(k+z\,;\,\theta),\phi)}{\sum_{i=1}^{m} s_{i} n_{i}/N_{i} s_{i} [F(i\,;\,g(k+z\,;\,\theta),\phi)-F(i-1\,;\,g(k+z\,;\,\theta),\phi)]\,dL},
+\frac{s(L) (n_{b}/N_{b}) f(L\,;\,g(k+z\,;\,\theta),\phi)}{\sum_{i=1}^{m} s_{i} n_{i}/N_{i} [F(i\,;\,g(k+z\,;\,\theta),\phi)-F(i-1\,;\,g(k+z\,;\,\theta),\phi)]\,dL},
 \]
-where \(f(x\,;\,\mu,\phi)\) and \(F(x\,;\,\mu,\phi)\) are the density and distributions functions of \(\mathcal{F}\), and \(L \in [l_{b-1},l_{b})\).
+where \(f(x\,;\,\mu,\phi)\) and \(F(x\,;\,\mu,\phi)\) are the density and distributions functions of
+\(\mathcal{F}\), and \(L \in [l_{b-1},l_{b})\).
 
-This package incorporates ageing error (in the form of an ageing error matrix, calculated outside the package), length-bin sampling, and gear selectivity in the estimation of growth parameters.
+This package incorporates ageing error (in the form of an ageing error matrix, calculated outside
+the package), length-bin sampling, and gear selectivity in the estimation of growth parameters.
 
 
 
