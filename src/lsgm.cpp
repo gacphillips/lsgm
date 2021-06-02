@@ -45,7 +45,7 @@ Type objective_function<Type>::operator() () {
       Type num = Type(0.0);
       Type den = Type(0.0);
 
-      // Probability of the measured age for this true age
+      // Probability of the true age given the observed age
       Type prAge = Aerr(a-Amin,A(i)-Amin);
 
       if(prAge > 0.0) {
