@@ -99,7 +99,7 @@ mkSelectivity <- function(xa,xb,sa,sb,ya,yb,xmin,xmax) {
     limb(xa,sa,xmin,ya,x)*(1-ja)+ja*((1-jb)+jb*limb(xb,sb,xmax,yb,x))
   }
 }
-selectivity <- mkSelectivity(500,800,120,350,0.01,0.15,0,2000)
+selectivity <- mkSelectivity(400,500,120,350,0.01,0.4,0,2000)
 plot(0:2000,selectivity(0:2000),type="l",xlab="Length",ylab="Selectivity")
 ```
 
