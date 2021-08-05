@@ -212,7 +212,9 @@ fit.lsgm <- lsVB(df.sample$age,df.sample$length,ageErr0,breaks,frac,
 summary(fit.lsgm)
 ```
 
-Plot the fitted growth curve, confidence intervals, and tolerance intervals for future observations
+Plot the fitted growth curve, confidence intervals, and tolerance intervals for future observations.
+
+# THIS DOESN'T WORK _ can't coerce object fit.lsgm into a dataframe...
 ```{r}
 d.lsgm <- predict(fit.lsgm,seq(0,maxAge,0.1),mean(season))
 plot(length~I(age+ageOffset),data=df.sample,pch=16,col=grey(0.5,0.1),ylim=c(0,1.2*Linf))
